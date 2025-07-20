@@ -24,6 +24,10 @@ export default function Home() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [quickAddLoading, setQuickAddLoading] = useState(false);
+  const [showMetadataDialog, setShowMetadataDialog] = useState(false);
+  const [pendingArticle, setPendingArticle] = useState<{ id: string; url: string } | null>(null);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualDescription, setManualDescription] = useState('');
 
   // Fetch articles and statistics on component mount
   useEffect(() => {
@@ -73,8 +77,15 @@ export default function Home() {
 
       if (response.ok) {
         setUrl('');
-        await fetchArticles();
-        await fetchStatistics();
+        
+        // Check if metadata extraction failed
+        if (data.needsMetadata) {
+          setPendingArticle({ id: data.article.id, url: data.article.url });
+          setShowMetadataDialog(true);
+        } else {
+          await fetchArticles();
+          await fetchStatistics();
+        }
       } else {
         setError(data.error || 'Failed to add article');
         // Clear error after 3 seconds
@@ -85,6 +96,39 @@ export default function Home() {
       setTimeout(() => setError(''), 3000);
     } finally {
       setQuickAddLoading(false);
+    }
+  };
+
+  const handleManualMetadata = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingArticle || !manualTitle.trim()) return;
+
+    try {
+      const response = await fetch('/api/articles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: pendingArticle.id,
+          title: manualTitle.trim(),
+          description: manualDescription.trim() || null
+        })
+      });
+
+      if (response.ok) {
+        setShowMetadataDialog(false);
+        setPendingArticle(null);
+        setManualTitle('');
+        setManualDescription('');
+        await fetchArticles();
+        await fetchStatistics();
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to update article');
+        setTimeout(() => setError(''), 3000);
+      }
+    } catch (error) {
+      setError('Failed to update article');
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -247,7 +291,90 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Manual Metadata Dialog */}
+        {showMetadataDialog && pendingArticle && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="modern-card p-8 max-w-md w-full">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Add Article Details</h2>
+                <button
+                  onClick={() => {
+                    setShowMetadataDialog(false);
+                    setPendingArticle(null);
+                    setManualTitle('');
+                    setManualDescription('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-blue-700 text-sm">
+                  <strong>URL:</strong> {pendingArticle.url}
+                </p>
+                <p className="text-blue-600 text-xs mt-1">
+                  Metadata extraction failed. Please add the title manually.
+                </p>
+              </div>
 
+              <form onSubmit={handleManualMetadata}>
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Article Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder="Enter the article title..."
+                    className="modern-input w-full"
+                    required
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={manualDescription}
+                    onChange={(e) => setManualDescription(e.target.value)}
+                    placeholder="Enter a brief description..."
+                    className="modern-input w-full h-24 resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    type="submit"
+                    disabled={!manualTitle.trim()}
+                    className="btn-primary flex-1"
+                  >
+                    Save Article
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMetadataDialog(false);
+                      setPendingArticle(null);
+                      setManualTitle('');
+                      setManualDescription('');
+                    }}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Articles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -278,7 +405,15 @@ export default function Home() {
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 leading-tight">
-                      {article.title || 'Untitled Article'}
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-blue-600 transition-colors cursor-pointer"
+                        title="Click to open article"
+                      >
+                        {article.title || 'Untitled Article'}
+                      </a>
                     </h3>
                     {article.description && (
                       <p className="text-gray-600 text-sm line-clamp-2 mb-3 leading-relaxed">{article.description}</p>
