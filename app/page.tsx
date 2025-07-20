@@ -314,9 +314,12 @@ export default function Home() {
               
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-blue-700 text-sm">
-                  <strong>URL:</strong> {pendingArticle.url}
+                  <strong>URL:</strong>
                 </p>
-                <p className="text-blue-600 text-xs mt-1">
+                <p className="text-blue-600 text-xs break-all word-break-all mt-1 leading-relaxed">
+                  {pendingArticle.url}
+                </p>
+                <p className="text-blue-600 text-xs mt-2">
                   Metadata extraction failed. Please add the title manually.
                 </p>
               </div>
