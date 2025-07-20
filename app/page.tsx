@@ -21,10 +21,9 @@ export default function Home() {
     finished: 0,
     completionPercentage: 0
   });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
 
   // Fetch articles and statistics on component mount
   useEffect(() => {
@@ -56,11 +55,11 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (!url.trim() || quickAddLoading) return;
 
-    setLoading(true);
+    setQuickAddLoading(true);
     setError('');
 
     try {
@@ -74,18 +73,22 @@ export default function Home() {
 
       if (response.ok) {
         setUrl('');
-        setShowAddForm(false);
         await fetchArticles();
         await fetchStatistics();
       } else {
         setError(data.error || 'Failed to add article');
+        // Clear error after 3 seconds
+        setTimeout(() => setError(''), 3000);
       }
     } catch (error) {
       setError('Failed to add article');
+      setTimeout(() => setError(''), 3000);
     } finally {
-      setLoading(false);
+      setQuickAddLoading(false);
     }
   };
+
+
 
   const updateStatus = async (id: string, status: Article['status']) => {
     try {
@@ -152,7 +155,7 @@ export default function Home() {
               </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 header-flex">
               {/* Search Bar */}
               <div className="relative">
                 <input
@@ -167,24 +170,42 @@ export default function Home() {
                 </svg>
               </div>
 
-              {/* Select Button */}
-              <button className="btn-secondary flex items-center">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Select
-              </button>
+              {/* Persistent URL Input */}
+              <form onSubmit={handleQuickAdd} className="flex items-center">
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="Paste article URL here..."
+                    className={`modern-input w-64 pl-4 pr-12 ${error ? 'border-red-300 focus:border-red-500' : ''}`}
+                    disabled={quickAddLoading}
+                  />
+                  {error && (
+                    <div className="absolute -bottom-8 left-0 bg-red-100 border border-red-300 text-red-700 px-3 py-1 rounded-lg text-xs whitespace-nowrap z-50">
+                      {error}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={quickAddLoading || !url.trim()}
+                  className="ml-2 btn-primary flex items-center justify-center w-10 h-10 rounded-full scale-hover"
+                  title="Add Article (Press Enter)"
+                >
+                  {quickAddLoading ? (
+                    <svg className="w-5 h-5 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                    </svg>
+                  )}
+                </button>
+              </form>
 
-              {/* Add Article Button */}
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="btn-primary flex items-center scale-hover"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Article
-              </button>
+
             </div>
           </div>
         </div>
@@ -226,60 +247,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Add Article Modal */}
-        {showAddForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="modern-card p-8 max-w-md w-full">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Add New Article</h2>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <form onSubmit={handleSubmit}>
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Article URL
-                  </label>
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://example.com/article"
-                    className="modern-input w-full"
-                    disabled={loading}
-                  />
-                </div>
-                {error && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-red-600 text-sm">{error}</p>
-                  </div>
-                )}
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={loading || !url.trim()}
-                    className="btn-primary flex-1"
-                  >
-                    {loading ? 'Adding...' : 'Add Article'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="btn-secondary"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+
 
         {/* Articles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -291,7 +259,7 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-gray-500 text-xl font-medium">
-                {searchTerm ? 'No articles found matching your search.' : 'No articles yet. Add your first article above!'}
+                {searchTerm ? 'No articles found matching your search.' : 'No articles yet. Paste a URL in the input above to get started!'}
               </p>
             </div>
           ) : (
